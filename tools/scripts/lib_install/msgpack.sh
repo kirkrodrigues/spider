@@ -14,7 +14,7 @@ if [ "$#" -lt 1 ] ; then
 fi
 version=$1
 
-package_name=msgpackc-cxx
+package_name=libmsgpack-cxx-dev
 temp_dir=/tmp/${package_name}-installation
 deb_output_dir=${temp_dir}
 if [[ "$#" -gt 1 ]] ; then
@@ -39,7 +39,7 @@ echo "Checking for elevated privileges..."
 privileged_command_prefix=""
 if [ ${EUID:-$(id -u)} -ne 0 ] ; then
   sudo echo "Script can elevate privileges."
-  privileged_command_prefix="${privileged_command_prefix} sudo"
+  privileged_command_prefix="sudo"
 fi
 
 # Download
@@ -57,20 +57,39 @@ fi
 
 # Set up
 cd ${extracted_dir}
-cmake .
+mkdir -p cmake-build-release
+cmake -S . -B cmake-build-release -DCMAKE_BUILD_TYPE=Release
 
-# Check if checkinstall is installed
-set +e
-command -v checkinstall
-checkinstall_installed=$?
-set -e
+###
+# INSTALL
+###
+deb_pkg_name="${package_name}-${version}"
+install_dir="${temp_dir}/${deb_pkg_name}"
+mkdir -p "$install_dir"
 
-# Install
-install_command_prefix="${privileged_command_prefix}"
-if [ $checkinstall_installed -eq 0 ] ; then
-  install_command_prefix="${install_command_prefix} checkinstall --pkgname '${package_name}' --pkgversion '${version}' --provides '${package_name}' --nodoc -y --pakdir \"${deb_output_dir}\""
-fi
-${install_command_prefix} cmake --build . --target install
+cmake --install cmake-build-release --prefix "$install_dir/usr"
+
+metadata_dir="${install_dir}/DEBIAN"
+mkdir -p "$metadata_dir"
+
+cat <<EOF > "${metadata_dir}/control"
+Package: $package_name
+Architecture: $(dpkg --print-architecture)
+Version: $version
+Maintainer: YScope Inc. <dev@yscope.com>
+Description: binary-based efficient object serialization library (development files)
+Section: libdevel
+Priority: optional
+EOF
+
+cd "$deb_output_dir"
+dpkg-deb --root-owner-group --build "$install_dir"
+install_cmd=(
+    "$privileged_command_prefix"
+    dpkg
+    -i "${deb_output_dir}/${deb_pkg_name}.deb"
+)
+DEBIAN_FRONTEND=noninteractive "${install_cmd[@]}"
 
 # Clean up
 rm -rf $temp_dir

@@ -48,7 +48,7 @@ echo "Checking for elevated privileges..."
 privileged_command_prefix=""
 if [ ${EUID:-$(id -u)} -ne 0 ] ; then
   sudo echo "Script can elevate privileges."
-  privileged_command_prefix="${privileged_command_prefix} sudo"
+  privileged_command_prefix="sudo"
 fi
 
 # Get number of cpu cores
@@ -80,13 +80,36 @@ command -v checkinstall
 checkinstall_installed=$?
 set -e
 
-# Install
-install_command_prefix="${privileged_command_prefix}"
-if [ $checkinstall_installed -eq 0 ] ; then
-  # NOTE: We use "1:${version}" to override the version installed by Ubuntu 18.04
-  install_command_prefix="${install_command_prefix} checkinstall --pkgname '${package_name}' --pkgversion '1:${version}' --provides '${package_name}' --nodoc -y --pakdir \"${deb_output_dir}\""
-fi
-${install_command_prefix} make install
+###
+# INSTALL
+###
+deb_pkg_name="${package_name}-${version}"
+install_dir="${temp_dir}/${deb_pkg_name}"
+mkdir -p "$install_dir"
+
+cmake --install . --prefix "$install_dir/usr"
+
+metadata_dir="${install_dir}/DEBIAN"
+mkdir -p "$metadata_dir"
+
+cat <<EOF > "${metadata_dir}/control"
+Package: $package_name
+Architecture: $(dpkg --print-architecture)
+Version: $version
+Maintainer: YScope Inc. <dev@yscope.com>
+Description: Very fast, header only or compiled, C++ logging library
+Section: libdevel
+Priority: optional
+EOF
+
+cd "$deb_output_dir"
+dpkg-deb --root-owner-group --build "$install_dir"
+install_cmd=(
+    "$privileged_command_prefix"
+    dpkg
+    -i "${deb_output_dir}/${deb_pkg_name}.deb"
+)
+DEBIAN_FRONTEND=noninteractive "${install_cmd[@]}"
 
 # Clean up
 rm -rf $temp_dir
