@@ -15,7 +15,8 @@ you'll need to:
 
 The example source code for this guide is in `examples/quick-start`.
 
-> [!NOTE] In the rest of this guide:
+> [!NOTE]
+> In the rest of this guide:
 > 1. we specify source file paths relative to `examples/quick-start`.
 > 2. all CMake commands should be run from inside `examples/quick-start`.
 
@@ -131,6 +132,12 @@ docker run \
 
 Alternatively, if you have an existing MySQL/MariaDB instance, you can use that as well. Simply
 create a database and authorize a user to access it.
+
+> [!NOTE]
+> To stop the database when you're done, run:
+> ```bash
+> docker stop spider-storage
+> ```
 
 ## Setting up the scheduler
 
